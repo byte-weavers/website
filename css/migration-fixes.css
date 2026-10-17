@@ -1,0 +1,158 @@
+/*
+ * Post-migration hardening for the static GitHub Pages build.
+ * Keep these rules conservative: they fix overflow/responsiveness without
+ * changing the site's visual identity.
+ */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+/* Flex/grid children can otherwise force horizontal page overflow. */
+.row > [class*="col-"],
+.ree-row-set,
+.ree-details-set,
+.ree-card,
+.ree-card-content,
+.fwb-main-x,
+.work-details,
+.work-details-center,
+.servic-block-a,
+.page-headings,
+.cta-heading,
+.cta-heading-wide-bt,
+.half-blog-card,
+.half-blog-content {
+  min-width: 0;
+}
+
+/* Allow long headings, email addresses and URLs to remain inside their cards. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+.dtb-details a,
+.footer-links-list a,
+.ree-card-content a,
+.work-details a,
+.work-details-center a,
+.servic-block-a a {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+/* Portfolio cards: consistent, resilient layout with buttons staying in-card. */
+.fwb-main-x {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fwb-main-x .work-thumbnails {
+  width: 100%;
+}
+
+.fwb-main-x .work-thumbnails img {
+  display: block;
+  width: 100%;
+}
+
+.fwb-main-x .work-details-center,
+.fwb-main-x .work-details {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.work-details-center h4,
+.work-details h4,
+.ree-card-content h3,
+.servic-block-a h4 {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ree-btn,
+.ree-btn-portfolio {
+  max-width: 100%;
+}
+
+/* Contact information is particularly prone to overflow on narrow screens. */
+.dtb-details a {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Embedded content should never extend beyond its container. */
+iframe {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .contact-details-block {
+    padding: 24px 20px;
+  }
+
+  .ree-details-set {
+    width: auto;
+    padding-left: 14px;
+  }
+
+  .dtb-details a {
+    font-size: 17px;
+    line-height: 1.45;
+  }
+
+  .work-details-center,
+  .work-details {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .ree-btn,
+  .ree-btn-portfolio {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .page-headings h1,
+  .page-headings h2,
+  .page-headings h3 {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 420px) {
+  .ree-btn {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .ree-btn-portfolio {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
