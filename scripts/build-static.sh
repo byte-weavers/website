@@ -45,6 +45,37 @@ import re
 site = Path('_site')
 endpoint = 'https://script.google.com/macros/s/AKfycbzqNhRLON09P8XsB52IdrEwl7dgxs8REh7g3h40gLXm5NcN43igAcq06IJqGJ3JWzd5Rw/exec'
 
+page_meta = {
+    'index.html': (
+        'Byte Weavers | Web & Mobile App Development',
+        'Byte Weavers builds custom web, mobile, eCommerce and cloud solutions for businesses.'
+    ),
+    'about.html': (
+        'About Byte Weavers | Software Development Company',
+        'Learn about Byte Weavers, our team, values and approach to building reliable digital products.'
+    ),
+    'services.html': (
+        'Software Development Services | Byte Weavers',
+        'Explore Byte Weavers services in web development, mobile apps, eCommerce, product design and cloud solutions.'
+    ),
+    'training.html': (
+        'IT Training | Byte Weavers',
+        'Explore practical, industry-focused technology training from Byte Weavers.'
+    ),
+    'portfolio.html': (
+        'Software Development Portfolio | Byte Weavers',
+        'Explore selected web, mobile, e-learning and business software projects delivered by Byte Weavers.'
+    ),
+    'blogs.html': (
+        'Technology Blog | Byte Weavers',
+        'Read Byte Weavers articles on web development, mobile apps, UX and modern software engineering.'
+    ),
+    'contact-us.html': (
+        'Contact Byte Weavers | Start Your Project',
+        'Contact Byte Weavers to discuss your web, mobile, cloud or software development requirements.'
+    ),
+}
+
 for path in site.rglob('*.html'):
     text = path.read_text(encoding='utf-8', errors='ignore')
 
@@ -64,6 +95,42 @@ for path in site.rglob('*.html'):
 
     # Normalize the sales email typo found in the old markup.
     text = re.sub(r'(?i)mailto:sales@byteweavers\.com', 'mailto:sales@byte-weavers.com', text)
+
+    # Normalize legacy target="blank" markup.
+    text = re.sub(r'(?i)target=("|\')blank\1', 'target="_blank"', text)
+
+    # Clean up theme metadata on generated pages.
+    text = text.replace('<html lang="eng"', '<html lang="en"')
+    text = text.replace('<meta name="author" content="rajesh-doot">', '<meta name="author" content="Byte Weavers">')
+
+    if path.name in page_meta:
+        title, description = page_meta[path.name]
+        text = re.sub(r'(?is)<title>.*?</title>', f'<title>{title}</title>', text, count=1)
+        text = re.sub(
+            r'(?is)<meta\s+name=("|\')description\1\s+content=("|\').*?\2\s*/?>',
+            f'<meta name="description" content="{description}">',
+            text,
+            count=1,
+        )
+
+    # The desktop navigation already had Training; the old mobile navigation did not.
+    if path.name in page_meta and 'id="main-nav"' in text:
+        text = text.replace(
+            '<li><a href="services.html">Services</a></li>\n                    <li><a href="portfolio.html">Portfolio</a></li>',
+            '<li><a href="services.html">Services</a></li>\n                    <li><a href="training.html">Training</a></li>\n                    <li><a href="portfolio.html">Portfolio</a></li>',
+            1,
+        )
+        text = text.replace('>Contact Page</a>', '>Contact Us</a>')
+
+    # Do not send visitors from real pages into the old generic theme service-details page.
+    if path.name == 'index.html':
+        text = re.sub(r'(?i)href=("|\')service-details\.html\1', 'href="services.html"', text)
+    elif path.name in ('services.html', 'training.html'):
+        text = re.sub(r'(?i)href=("|\')service-details\.html\1', 'href="contact-us.html"', text)
+
+    # One visible blog title still pointed to the generic theme blog-details page.
+    if path.name == 'blogs.html':
+        text = re.sub(r'(?i)href=("|\')blog-details\.html\1', 'href="creating-user-friendly-web.html"', text)
 
     # Old portfolio Demo endpoints are no longer hosted. Route every Demo button to Contact Us.
     def replace_demo_anchor(match):
@@ -184,6 +251,15 @@ if portfolio.exists():
     portfolio_text = portfolio.read_text(encoding='utf-8', errors='ignore')
     if re.search(r'(?is)>\s*Demo\b', portfolio_text):
         raise SystemExit('A Demo button remains on the migrated portfolio page')
+
+for name in ('index.html', 'services.html', 'training.html'):
+    page = site / name
+    if page.exists() and 'href="service-details.html"' in page.read_text(encoding='utf-8', errors='ignore'):
+        raise SystemExit(f'{name} still links to the legacy service-details template')
+
+blogs = site / 'blogs.html'
+if blogs.exists() and 'href="blog-details.html"' in blogs.read_text(encoding='utf-8', errors='ignore'):
+    raise SystemExit('blogs.html still links to the legacy generic blog-details template')
 
 if not (site / 'webfonts' / 'fa-solid-900.woff2').exists():
     raise SystemExit('Font Awesome webfonts were not copied to the Pages artifact')
