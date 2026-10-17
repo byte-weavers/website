@@ -64,6 +64,34 @@ p,
   word-break: normal;
 }
 
+/* Keep Owl carousel stages clipped to their own cards/sections. */
+.owl-carousel,
+.owl-stage-outer,
+.trust-review {
+  max-width: 100%;
+}
+
+.trust-review {
+  overflow: hidden;
+}
+
+.trust-review .owl-stage-outer {
+  overflow: hidden !important;
+}
+
+.trust-review .items {
+  width: 100%;
+  min-width: 0;
+}
+
+.trust-review .review-text,
+.trust-review .review-text p {
+  width: 100%;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
 /* Portfolio cards: consistent, resilient layout with buttons staying in-card. */
 .fwb-main-x {
   height: 100%;
