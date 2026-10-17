@@ -4,8 +4,8 @@ set -euo pipefail
 rm -rf _site
 mkdir -p _site
 
-# Copy static assets and existing static pages.
-for dir in css fonts images js vendor; do
+# Copy static assets and existing static pages. Font Awesome expects ../webfonts.
+for dir in css fonts webfonts images js vendor; do
   if [ -d "$dir" ]; then
     cp -a "$dir" "_site/$dir"
   fi
@@ -37,7 +37,7 @@ else
   exit 1
 fi
 
-# Rewrite internal PHP links and connect real lead forms to the Google Apps Script backend.
+# Rewrite legacy URLs, connect forms, and apply migration-specific polish.
 python3 - <<'PY'
 from pathlib import Path
 import re
@@ -47,23 +47,50 @@ endpoint = 'https://script.google.com/macros/s/AKfycbzqNhRLON09P8XsB52IdrEwl7dgx
 
 for path in site.rglob('*.html'):
     text = path.read_text(encoding='utf-8', errors='ignore')
+
+    # PHP routes become generated static HTML routes.
     text = re.sub(
         r'(?i)(href|action)=("|\')([^"\']+?)\.php([?#][^"\']*)?\2',
         lambda m: f'{m.group(1)}={m.group(2)}{m.group(3)}.html{m.group(4) or ""}{m.group(2)}',
         text,
     )
 
-    counter = 0
+    # Quote/get-quote pages do not exist in this migrated site; use the working contact page.
+    text = re.sub(
+        r'(?i)href=("|\')(?:\./)?get-quote(?:-2)?\.html(?:[?#][^"\']*)?\1',
+        'href="contact-us.html"',
+        text,
+    )
+
+    # Normalize the sales email typo found in the old markup.
+    text = re.sub(r'(?i)mailto:sales@byteweavers\.com', 'mailto:sales@byte-weavers.com', text)
+
+    # Old portfolio Demo endpoints are no longer hosted. Route every Demo button to Contact Us.
+    def replace_demo_anchor(match):
+        opening = match.group(1)
+        inner = match.group(2)
+        if not re.search(r'(?is)^\s*Demo\b', re.sub(r'<[^>]+>', '', inner)):
+            return match.group(0)
+        opening = re.sub(r'(?i)href=("|\')[^"\']*\1', 'href="contact-us.html"', opening)
+        # Keep the existing arrow icon markup, only change the visible label.
+        inner = re.sub(r'(?is)^\s*Demo\b', 'Contact Us', inner, count=1)
+        return opening + inner + '</a>'
+
+    text = re.sub(r'(?is)(<a\b[^>]*>)(.*?)</a>', replace_demo_anchor, text)
+
+    # Load the conservative post-migration CSS on every generated page.
+    if 'migration-fixes.css' not in text:
+        link = '<link href="css/migration-fixes.css" rel="stylesheet">'
+        if re.search(r'(?i)</head>', text):
+            text = re.sub(r'(?i)</head>', link + '\n</head>', text, count=1)
 
     def wire_contact_form(match):
-        nonlocal_counter = None
         block = match.group(0)
         lower = block.lower()
         # Only touch genuine inquiry/contact forms, not search/newsletter/login forms.
         if not all(f'name="{field}"' in lower or f"name='{field}'" in lower for field in ('name', 'email', 'message')):
             return block
 
-        # Use a stable per-page form number.
         wire_contact_form.count += 1
         idx = wire_contact_form.count
         frame_id = f'bw-contact-frame-{idx}'
@@ -72,9 +99,8 @@ for path in site.rglob('*.html'):
 
         opening_end = block.find('>')
         opening = block[:opening_end + 1]
-        body = block[opening_end + 1:-7]  # strip closing </form>
+        body = block[opening_end + 1:-7]
 
-        # Replace/append form attributes while preserving existing classes/name.
         opening = re.sub(r'\saction=("|\')[^"\']*\1', '', opening, flags=re.I)
         opening = re.sub(r'\smethod=("|\')[^"\']*\1', '', opening, flags=re.I)
         opening = re.sub(r'\starget=("|\')[^"\']*\1', '', opening, flags=re.I)
@@ -145,13 +171,22 @@ for path in site.rglob('*.html'):
     text = re.sub(r'(?is)<form\b[^>]*>.*?</form>', wire_contact_form, text)
     path.write_text(text, encoding='utf-8')
 
-# Ensure at least the primary contact form was wired; fail the build if not.
+# Build-time safety checks for the migrated production pages.
 contact = site / 'contact-us.html'
 if not contact.exists():
     raise SystemExit('contact-us.html was not generated')
 contact_text = contact.read_text(encoding='utf-8', errors='ignore')
 if 'data-byte-weavers-contact="true"' not in contact_text:
     raise SystemExit('Primary contact form was not connected to the Apps Script backend')
+
+portfolio = site / 'portfolio.html'
+if portfolio.exists():
+    portfolio_text = portfolio.read_text(encoding='utf-8', errors='ignore')
+    if re.search(r'(?is)>\s*Demo\b', portfolio_text):
+        raise SystemExit('A Demo button remains on the migrated portfolio page')
+
+if not (site / 'webfonts' / 'fa-solid-900.woff2').exists():
+    raise SystemExit('Font Awesome webfonts were not copied to the Pages artifact')
 PY
 
 touch _site/.nojekyll
