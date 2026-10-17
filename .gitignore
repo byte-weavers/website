@@ -1,0 +1,5 @@
+.idea/
+.DS_Store
+PHPMailer.php
+SMTP.php
+.htaccess
